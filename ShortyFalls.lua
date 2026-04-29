@@ -477,11 +477,18 @@ end
 
 local function AddListenerSymbol(symbolIndex)
   if not frame or not symbolIndex then return end
+
   listenerStep = listenerStep + 1
   if listenerStep > 5 then listenerStep = 5 end
 
   local slot = cells[listenerStep]
+
   SetListenerSlotSymbol(slot, symbolIndex)
+
+  if slot.num then
+    slot.num:SetText(tostring(listenerStep))
+  end
+
   SetCellGlow(slot, true, false)
 
   if listenerStep > 1 then
