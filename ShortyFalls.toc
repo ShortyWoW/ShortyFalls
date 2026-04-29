@@ -4,5 +4,6 @@
 ## Author: Shorty
 ## Version: 1.4.0
 ## SavedVariables: ShortyFallsDB
+## IconTexture: Interface\AddOns\ShortyFalls\ShortyFalls.blp
 
 ShortyFalls.lua
