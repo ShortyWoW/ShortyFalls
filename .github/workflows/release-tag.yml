@@ -19,24 +19,22 @@ jobs:
       - name: Validate required addon files exist
         run: |
           set -e
-          test -f "ShortyFalls/ShortyFalls.toc" || (echo "ERROR: ShortyFalls/ShortyFalls.toc not found" && exit 1)
-          test -f "ShortyFalls/ShortyFalls.lua" || (echo "ERROR: ShortyFalls/ShortyFalls.lua not found" && exit 1)
+          test -f "ShortyFalls.toc" || (echo "ERROR: ShortyFalls.toc not found" && exit 1)
+          test -f "ShortyFalls.lua" || (echo "ERROR: ShortyFalls.lua not found" && exit 1)
 
-          # Optional assets: include if you actually ship them
-          if [ -d "ShortyFalls/Media" ]; then
-            echo "Found ShortyFalls/Media/"
+          if [ -d "media" ]; then
+            echo "Found media/"
+          else
+            echo "ERROR: media/ folder not found" && exit 1
           fi
-
-          # If you have a .blp icon and want it in the zip, enforce it here:
-          # test -f "ShortyFalls/ShortyFalls.blp" || (echo "ERROR: ShortyFalls/ShortyFalls.blp not found" && exit 1)
 
       - name: Set TOC version from tag
         run: |
           set -e
-          VER="${GITHUB_REF_NAME#v}"   # v0.1.6 -> 0.1.6
+          VER="${GITHUB_REF_NAME#v}"
           echo "VER=${VER}" >> $GITHUB_ENV
 
-          TOC="ShortyFalls/ShortyFalls.toc"
+          TOC="ShortyFalls.toc"
           if grep -qE '^## Version:' "$TOC"; then
             sed -i "s/^## Version:.*/## Version: ${VER}/" "$TOC"
           else
@@ -46,23 +44,23 @@ jobs:
           echo "TOC version now:"
           grep -E '^## Version:' "$TOC" || true
 
-      - name: Stage addon payload (force ShortyFalls folder; exclude repo/dev files)
+      - name: Stage addon payload
         run: |
           set -e
           rm -rf _stage
           mkdir -p _stage/ShortyFalls
 
-          # Copy ONLY what should ship (entire addon folder)
-          cp -a ShortyFalls/* _stage/ShortyFalls/
+          cp ShortyFalls.toc _stage/ShortyFalls/
+          cp ShortyFalls.lua _stage/ShortyFalls/
+          cp -a media _stage/ShortyFalls/media
 
-          # Optional: strip OS junk if it exists
           find _stage -name ".DS_Store" -delete || true
           find _stage -name "Thumbs.db" -delete || true
 
           echo "Staged contents:"
           ls -lah _stage/ShortyFalls
 
-      - name: Create zip (versioned filename for WowUp display)
+      - name: Create zip
         run: |
           set -e
           ZIP_NAME="ShortyFalls-${VER}.zip"
