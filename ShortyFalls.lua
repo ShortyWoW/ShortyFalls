@@ -2,18 +2,20 @@ local ADDON_NAME = ...
 local SF = {}
 _G.ShortyFalls = SF
 
-print("|cff66ccffShortyFalls|r loaded.")
+print("|cff66ccffShortyFalls|r loaded. Simple/Mythic build.")
 
 -- -------------------------------------------------------
 -- UI state
 -- -------------------------------------------------------
 local frame
 local cells = {}
+local autoResetHandle
 
 -- -------------------------------------------------------
 -- Config
 -- -------------------------------------------------------
 local TARGET_INSTANCE_MAP_ID = 2913
+local DEFAULT_AUTO_RESET_DELAY = 20
 
 local CELL_SIZE = 44
 local CELL_GAP  = 6
@@ -48,7 +50,8 @@ local TEXTURE_MAP = {
 local function DB()
   if not ShortyFallsDB then ShortyFallsDB = {} end
   if ShortyFallsDB.locked == nil then ShortyFallsDB.locked = true end
-  if ShortyFallsDB.debugMode == nil then ShortyFallsDB.debugMode = false end
+  if ShortyFallsDB.manualHidden == nil then ShortyFallsDB.manualHidden = false end
+  if ShortyFallsDB.autoResetDelay == nil then ShortyFallsDB.autoResetDelay = DEFAULT_AUTO_RESET_DELAY end
   if not ShortyFallsDB.assign then ShortyFallsDB.assign = {} end
   if not ShortyFallsDB.used then ShortyFallsDB.used = {} end
   if not ShortyFallsDB.sequence then ShortyFallsDB.sequence = {} end
@@ -58,15 +61,7 @@ end
 -- -------------------------------------------------------
 -- Raid visibility gate
 -- -------------------------------------------------------
-local function IsDebugForced()
-  return ShortyFallsDB and ShortyFallsDB.debugMode == true
-end
-
 local function ShouldBeActive()
-  if IsDebugForced() then
-    return true
-  end
-
   local _, instanceType, _, _, _, _, _, mapID = GetInstanceInfo()
   return instanceType == "raid" and mapID == TARGET_INSTANCE_MAP_ID
 end
@@ -78,6 +73,13 @@ end
 
 local function UpdateVisibility()
   if not frame then return end
+
+  local db = DB()
+
+  if db.manualHidden then
+    frame:Hide()
+    return
+  end
 
   if ShouldBeActive() then
     frame:Show()
@@ -293,11 +295,39 @@ local function ApplyLockState()
 end
 
 -- -------------------------------------------------------
+-- Auto-reset timer
+-- -------------------------------------------------------
+local function CancelAutoResetTimer()
+  if autoResetHandle then
+    autoResetHandle:Cancel()
+    autoResetHandle = nil
+  end
+end
+
+local ResetAll
+
+local function StartAutoResetTimer()
+  CancelAutoResetTimer()
+
+  local delay = tonumber(DB().autoResetDelay) or DEFAULT_AUTO_RESET_DELAY
+  if delay <= 0 then return end
+
+  autoResetHandle = C_Timer.NewTimer(delay, function()
+    autoResetHandle = nil
+    if ResetAll then
+      ResetAll()
+      print("|cff66ccffShortyFalls|r auto-reset after " .. tostring(delay) .. "s.")
+    end
+  end)
+end
+
+-- -------------------------------------------------------
 -- Logic
 -- -------------------------------------------------------
-local function ResetAll()
+ResetAll = function()
   local db = DB()
 
+  CancelAutoResetTimer()
   wipe(db.assign)
   wipe(db.used)
   wipe(db.sequence)
@@ -331,6 +361,7 @@ local function Assign(i)
     if step == 5 then
       RenderMythicSequenceVisuals()
       SetCompleteVisual(true)
+      StartAutoResetTimer()
     else
       RenderMythicEntryVisuals()
       SetCompleteVisual(false)
@@ -353,6 +384,7 @@ local function Assign(i)
   if n == 5 then
     ReorderByAssignedNumber()
     SetCompleteVisual(true)
+    StartAutoResetTimer()
   end
 end
 
@@ -488,31 +520,36 @@ SLASH_SHORTYFALLS1 = "/sfalls"
 SlashCmdList["SHORTYFALLS"] = function(msg)
   msg = (msg or ""):lower()
 
-  if msg == "debug" then
-    local db = DB()
-    db.debugMode = not db.debugMode
-
-    if db.debugMode then
-      frame:Show()
-      print("|cff66ccffShortyFalls|r debug mode |cff00ff00ON|r - frame forced visible.")
+  local delayValue = msg:match("^delay%s+([%d%.]+)$")
+  if delayValue then
+    local delay = tonumber(delayValue)
+    if delay and delay >= 0 then
+      DB().autoResetDelay = delay
+      print("|cff66ccffShortyFalls|r auto-reset delay set to " .. tostring(delay) .. "s.")
     else
-      UpdateVisibility()
-      print("|cff66ccffShortyFalls|r debug mode |cffff0000OFF|r - raid mapID 2913 gate restored.")
+      print("|cff66ccffShortyFalls|r usage: /sfalls delay 20")
     end
     return
   end
 
+  if msg == "delay" then
+    print("|cff66ccffShortyFalls|r auto-reset delay is " .. tostring(DB().autoResetDelay or DEFAULT_AUTO_RESET_DELAY) .. "s. Usage: /sfalls delay 20")
+    return
+  end
+
   if msg == "show" then
+    DB().manualHidden = false
     if ShouldBeActive() then
       frame:Show()
     else
       frame:Hide()
-      print("|cff66ccffShortyFalls|r only shows inside raid mapID 2913. Use /sfalls debug to force it open.")
+      print("|cff66ccffShortyFalls|r only shows inside raid mapID 2913.")
     end
     return
   end
 
   if msg == "hide" then
+    DB().manualHidden = true
     frame:Hide()
     return
   end
@@ -536,21 +573,11 @@ SlashCmdList["SHORTYFALLS"] = function(msg)
     return
   end
 
-  if msg == "where" then
-    local name, instanceType, difficultyID, _, _, _, _, mapID = GetInstanceInfo()
-    print("|cff66ccffShortyFalls|r Instance:", name or "nil", "Type:", instanceType or "nil", "MapID:", tostring(mapID))
-    print("|cff66ccffShortyFalls|r DifficultyID:", tostring(difficultyID), "Mode:", IsMythicRaid() and "MYTHIC SEQUENCE" or "STANDARD UNIQUE")
-    print("|cff66ccffShortyFalls|r Active:", ShouldBeActive() and "YES" or "NO")
-    print("|cff66ccffShortyFalls|r Debug Mode:", DB().debugMode and "ON" or "OFF")
-    return
-  end
-
   print("|cff66ccffShortyFalls commands|r:")
-  print("/sfalls debug")
   print("/sfalls show")
   print("/sfalls hide")
   print("/sfalls lock")
   print("/sfalls unlock")
   print("/sfalls clear")
-  print("/sfalls where")
+  print("/sfalls delay 20")
 end
