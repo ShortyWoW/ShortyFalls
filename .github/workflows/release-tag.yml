@@ -21,6 +21,7 @@ jobs:
           set -e
           test -f "ShortyFalls.toc" || (echo "ERROR: ShortyFalls.toc not found" && exit 1)
           test -f "ShortyFalls.lua" || (echo "ERROR: ShortyFalls.lua not found" && exit 1)
+          test -f "ShortyFalls.blp" || (echo "ERROR: ShortyFalls.blp not found" && exit 1)
 
           if [ -d "media" ]; then
             echo "Found media/"
@@ -52,8 +53,9 @@ jobs:
 
           cp ShortyFalls.toc _stage/ShortyFalls/
           cp ShortyFalls.lua _stage/ShortyFalls/
+          cp ShortyFalls.blp _stage/ShortyFalls/
           cp -a media _stage/ShortyFalls/media
-
+          
           find _stage -name ".DS_Store" -delete || true
           find _stage -name "Thumbs.db" -delete || true
 
